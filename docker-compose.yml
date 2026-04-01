@@ -2,7 +2,7 @@ services:
   ircserv:
     build:
       context: .
-      dockerfile: Dockerfile.server
+      dockerfile: Dockerfile
     container_name: ircserv
     env_file:
       - .env

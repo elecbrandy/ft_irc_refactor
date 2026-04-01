@@ -1,4 +1,6 @@
-# ft_irc
+# ft_irc_refactor
+
+> 이 Repository는 `2024.10-11` 진행했던 [ft_irc](https://github.com/elecbrandy/ft_irc) 프로젝트를 리팩토링하기 위해 제작되었습니다.
 
 `ft_irc`는 [IRC(Internet Relay Chat)](https://en.wikipedia.org/wiki/Internet_Relay_Chat) 프로토콜을 직접 구현하는 프로젝트입니다. 이 프로젝트의 목표는 **소켓 프로그래밍과 네트워크 프로토콜의 기본 원리를 이해** 하고, 클라이언트-서버 구조, 멀티플렉싱, 채널/사용자 관리 및 명령어 처리 로직을 직접 구현하는 것입니다.
 
