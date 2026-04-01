@@ -1,5 +1,5 @@
-#include "Client.hpp"
-#include "Server.hpp"
+#include "../include/Client.hpp"
+#include "../include/Server.hpp"
 
 Client::Client(in_addr addr)
 :	_hostname(inet_ntoa(addr)),

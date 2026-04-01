@@ -7,7 +7,7 @@
 #include <cctype>
 #include <stdexcept>
 #include "Server.hpp"
-#include "ServerCode.hpp"
+#include "ServerMsg.hpp"
 
 class ArgParser {
 private:

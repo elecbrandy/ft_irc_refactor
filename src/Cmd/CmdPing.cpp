@@ -1,4 +1,4 @@
-#include "Cmd.hpp"
+#include "../../include/Cmd.hpp"
 
 void Cmd::cmdPing() {
     // 명령어를 보낸 클라이언트가 register 되지 않은 경우

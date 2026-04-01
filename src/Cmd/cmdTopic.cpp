@@ -1,4 +1,4 @@
-#include "Cmd.hpp"
+#include "../../include/Cmd.hpp"
 
 /*
 명령어 : /Topic <channel> [<topic>]

@@ -21,7 +21,7 @@
 # include "Channel.hpp"
 # include "ServerMsg.hpp"
 # include "ReplyCode.hpp"
-# include "Cmd/Cmd.hpp"
+# include "Cmd.hpp"
 
 # define MAX_CLIENTS 20
 # define BUFFER_SIZE 513
@@ -58,7 +58,18 @@ private:
 	std::map<int, Client*>					_clients;
 	std::map<std::string, Channel *>		_channels;
 	std::map<std::string, Client*>			nickNameClientMap;
-	std::vector<int>						_fdsToRemove;
+
+	/* Enhanced event handlers */
+	bool									processServerEvent();			// 새 클라이언트 연결 처리
+	bool									processClientRead(int fd);		// 클라이언트 읽기 처리 (bool 반환)
+	bool									processClientWrite(int fd);		// 클라이언트 쓰기 처리 (bool 반환)
+	
+	/* Cleanup helpers */
+	void									markClientForRemoval(int fd);	// fd를 제거 대상으로 표시
+	void									cleanupMarkedClients();			// 표시된 fd들을 정리
+	
+	/* State management */
+	bool									shouldExitServer();				// 서버 종료 여부 판단
 
 public:
 	IrcServer();
@@ -84,7 +95,6 @@ public:
 	void									castMsg(int client_fd, const std::string message);
 	void									broadcastMsg(const std::string& message, Channel* channel, int senderFd);
 	void									removeChannel(const std::string channelName);
-	void									removeClientFd(int client_fd);
 	void									removeClientFromServer(Client* client);
 	void									addClientByNickname(const std::string& nickname, Client* client);
 	void									updateClients(Client* client);
@@ -104,6 +114,9 @@ public:
 		virtual ~ServerException() throw() {};
 		virtual const char*	 what() const throw();
 	};
+
+	/* Utility functions */
+	bool									canRecover(const ServerException& e);
 };
 
 #endif

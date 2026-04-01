@@ -1,4 +1,4 @@
-#include "Channel.hpp"
+#include "../include/Channel.hpp"
 
 Channel::Channel(std::string name) :
 _name(name), _key(""), _topic(""), _mode() , _participant() {}

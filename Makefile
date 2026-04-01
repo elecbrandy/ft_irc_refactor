@@ -9,6 +9,7 @@ SRCS_MAIN = $(wildcard src/*.cpp)
 SRCS    = $(SRCS_MAIN) $(SRCS_CMD)
 HDRS    = $(wildcard src/*.hpp)
 OBJS    = $(SRCS:.cpp=.o)
+TEST_SCRIPT = test/test_basic.py
 
 # -------------------------------------------------------
 # Local Build
@@ -57,5 +58,19 @@ status:
 
 clean-docker:
 	docker compose down --rmi all --volumes --remove-orphans
+
+test: $(NAME)
+	@echo "$(GREEN)Starting local integration tests...$(RESET)"
+	@pkill $(NAME) || true
+	@# 서버 실행 (로그를 터미널에 직접 쏘거나, 명확하게 리다이렉션)
+	@./$(NAME) $(IRC_PORT) $(IRC_PASSWORD) > test_server.log 2>&1 & \
+		SERVER_PID=$$!; \
+		echo "Server started with PID: $$SERVER_PID"; \
+		sleep 2; \
+		python3 $(TEST_SCRIPT); \
+		TEST_EXIT_CODE=$$?; \
+		echo "Test finished with exit code: $$TEST_EXIT_CODE"; \
+		kill $$SERVER_PID; \
+		exit $$TEST_EXIT_CODE
 
 .PHONY: all clean fclean re up down restart log status clean-docker

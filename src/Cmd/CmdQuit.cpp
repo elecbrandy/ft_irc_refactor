@@ -1,4 +1,4 @@
-#include "Cmd.hpp"
+#include "../../include/Cmd.hpp"
 
 void Cmd::cmdQuit() {
 	Client* client = server.getClient(client_fd);
