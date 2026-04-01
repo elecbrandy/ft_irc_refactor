@@ -160,66 +160,65 @@ void IrcServer::checkPingTimeOut() {
 }
 
 void IrcServer::run() {
-    bool exitFlag = false;
-    while (true) {
+    while (!shouldExitServer()) {
         try {
             checkPingTimeOut();
-
-            int timeout_ms = 1000; // 1000ms = 1초
+ 
+            int timeout_ms = 1000;
             if (poll(&_fds[0], _fds.size(), timeout_ms) < 0) {
-                if (errno != EINTR) {
-                    exitFlag = true;
+                if (errno == EINTR) {
+                    continue;  // 신호로 인한 중단은 무시하고 계속
                 }
+                // 다른 에러는 catch 블록에서 처리
                 throw ServerException(ERR_POLL);
             }
-
-            for (int i = _fds.size() - 1; i >= 0; --i) {
-                int current_fd = _fds[i].fd;
-                
-                // 이미 삭제된(-1) 소켓이거나 이벤트가 발생하지 않았으면 스킵
-                if (current_fd < 0 || _fds[i].revents == 0) {
-                    continue; 
+ 
+            for (size_t i = 0; i < _fds.size(); ++i) {
+                if (_fds[i].revents == 0) {
+                    continue;  // 이벤트 없으면 스킵
                 }
-
-                // 1. 서버 소켓 (새 연결 요청)
-                if (current_fd == this->_fd) {
-                    if (_fds[i].revents & POLLIN) {
-                        acceptClient();
+ 
+                // 소켓 이벤트 처리
+                if (_fds[i].fd == this->_fd) {
+                    if (!processServerEvent()) {
+                        throw ServerException(ERR_ACCEPT_CLIENT);
                     }
                     continue;
                 }
-
-                // 2. 클라이언트 소켓 (POLLIN: 데이터 수신)
+ 
+                int client_fd = _fds[i].fd;
+ 
+                // 클라이언트 읽기 처리
                 if (_fds[i].revents & POLLIN) {
-                    handleSocketRead(current_fd);
+                    if (!processClientRead(client_fd)) {
+                        // 에러 발생, 해당 클라이언트 제거 표시
+                        markClientForRemoval(client_fd);
+                        continue;
+                    }
                 }
-
-                // 3. 클라이언트 소켓 (POLLOUT: 데이터 송신)
-                // 앞선 handleSocketRead 도중 에러가 나서 removeClientFromServer가 
-                // 호출되었다면, _fds[i].fd는 -1로 변경되었을 것 -> 이를 확인하여 방어
-                if (_fds[i].fd != -1 && (_fds[i].revents & POLLOUT)) {
-                    handleSocketWrite(current_fd);
-                }
-            }
-
-            // 루프 순회가 끝난 후, 무효화된(-1) fd들을 일괄적으로 삭제
-            for (std::vector<struct pollfd>::iterator it = _fds.begin(); it != _fds.end(); ) {
-                if (it->fd == -1) {
-                    it = _fds.erase(it);
-                } else {
-                    ++it;
+ 
+                // 쓰기 처리 (존재 여부만 간단히 확인)
+                // _fds[i].fd는 이미 -1로 변경되었을 수 있으므로 재검사 필요
+                int current_fd = _fds[i].fd;
+                if (current_fd != -1 && (_fds[i].revents & POLLOUT)) {
+                    if (!processClientWrite(current_fd)) {
+                        markClientForRemoval(current_fd);
+                    }
                 }
             }
-
+ 
+            // 중앙화된 cleanup (루프 끝에서 한 번만)
+            cleanupMarkedClients();
+ 
         } catch (const ServerException& e) {
             serverLog(this->_fd, LOG_ERR, C_ERR, e.what());
-            if (exitFlag) {
-                exit(EXIT_FAILURE);
+            // 복구 가능한 에러는 계속, 아니면 종료
+            if (!canRecover(e)) {
+                break;
             }
         }
     }
 }
-
 
 void IrcServer::handleSocketRead(int fd) {
 	Client* client = getClient(fd);
@@ -470,4 +469,200 @@ void IrcServer::enablePollOutEvent(int client_fd) {
 			break;
 		}
 	}
+}
+
+/* 
+	processServerEvent()
+	- 서버 소켓 이벤트 처리
+	- 새로운 클라이언트 연결 수락
+   	- 기존 acceptClient()를 래핑하되, 에러 처리 개선
+   
+	return:
+	- true: 정상 처리 (또는 무시 가능한 에러)
+	- false: 복구 불가능한 에러
+*/
+bool IrcServer::processServerEvent() {
+    try {
+        acceptClient();
+        return true;
+    } catch (const ServerException& e) {
+        return false;
+    }
+}
+
+/* 
+	processClientRead(int fd)
+	- 클라이언트 읽기 처리
+	- 기존 handleSocketRead() 로직을 유지
+	- bool 반환 추가 (실패 시 false)
+	- 클라이언트 삭제 시 명시적 신호
+   
+	return:
+	- true: 정상 처리 (또는 무시 가능한 에러)
+	- false: 클라이언트 삭제 필요
+*/
+bool IrcServer::processClientRead(int fd) {
+    Client* client = getClient(fd);
+    if (!client) {
+        return false;  // 클라이언트가 없음 (이미 삭제됨)
+    }
+
+    char buffer[BUFFER_SIZE];
+    size_t recvLen = recv(fd, buffer, BUFFER_SIZE - 1, 0);
+    
+    // 연결 종료 또는 에러
+    if (recvLen <= 0) {
+		return false;  // 클라이언트 제거 필요
+	}
+
+    buffer[recvLen] = '\0';
+    client->appendToRecvBuffer(buffer);
+    
+    // 메시지 추출 및 처리
+    std::string str;
+    while (getClient(fd) && client->extractMessage(str)) {
+		try {
+			Cmd cmdHandler(*this, str, fd);
+			serverLog(fd, LOG_INPUT, C_MSG, str);
+			
+			// handleClientCmd()가 false 반환 시 클라이언트가 삭제된 것이므로 루프 탈출
+			if (!cmdHandler.handleClientCmd()) {
+				return false;  // 클라이언트가 삭제됨
+			}
+		} catch (std::exception& e) {
+			serverLog(fd, LOG_ERR, C_ERR, std::string("Error processing command: ") + e.what());
+		}
+    }
+    
+    return true;  // 정상 처리
+}
+
+/*
+	processClientWrite(int fd)
+	- 클라이언트 쓰기 처리
+	- 기존 handleSocketWrite() 로직 유지
+	- bool 반환 추가
+	- 에러 처리 명확화 
+*/ 
+bool IrcServer::processClientWrite(int fd) {
+    Client* client = getClient(fd);
+    if (!client) {
+        return false;
+    }
+
+    std::string& sendBuffer = client->getSendBuffer();
+
+    if (!sendBuffer.empty()) {
+        ssize_t sendLen = send(fd, sendBuffer.c_str(), sendBuffer.size(), 0);
+        
+        if (sendLen > 0) {
+            // 부분 또는 전체 전송 성공
+            sendBuffer.erase(0, sendLen);
+        } else if (sendLen == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            // 복구 불가능한 에러
+            removeClientFromServer(client);
+            return false;
+        }
+        // EAGAIN/EWOULDBLOCK은 무시하고 나중에 재시도
+    }
+
+    // 전송 완료 시 POLLOUT 이벤트 비활성화
+    if (sendBuffer.empty()) {
+        for (size_t i = 0; i < _fds.size(); ++i) {
+            if (_fds[i].fd == fd) {
+                _fds[i].events &= ~POLLOUT;
+                break;
+            }
+        }
+    }
+
+    return true;  // 정상 처리
+}
+
+/* 
+	markClientForRemoval(int fd)
+	- 클라이언트 제거 표시
+	- fd를 제거 대상으로 표시 (즉시 삭제하지 않음)
+   	- cleanup 단계에서 일괄 처리
+		- 루프 중간에 _clients 수정 안 함
+   		- 인덱스 변경 없음
+   		- 타이밍 이슈 방지
+*/
+void IrcServer::markClientForRemoval(int fd) {
+	Client* client = getClient(fd);
+	if (!client)
+		return ;
+
+	serverLog(fd, LOG_SERVER, C_WARN, "Marking client for removal: " + intToString(fd));
+
+    // _fds에서 해당 fd의 항목을 찾아 -1로 표시
+    for (size_t i = 0; i < _fds.size(); ++i) {
+        if (_fds[i].fd == fd) {
+            _fds[i].fd = -1;  // 마킹
+            break;
+        }
+    }
+    removeClientFromServer(getClient(fd));  // 클라이언트 제거 처리 (채널 퇴장 등)
+}
+
+
+/* ========================================
+   5. cleanupMarkedClients() - 제거 대상 정리
+   
+   목적:
+   - markClientForRemoval()로 표시된 fd 정리
+   - _clients와 _fds 동시 정리
+   
+   호출 시점:
+   - run() 루프의 폴 순회 완료 후
+   - 모든 fd 접근이 완료된 후에만 호출
+   ======================================== */
+
+void IrcServer::cleanupMarkedClients() {
+    // 1. _fds에서 -1인 항목 제거
+    std::vector<struct pollfd>::iterator it = _fds.begin();
+
+    while (it != _fds.end()) {
+        if (it->fd == -1) {
+            it = _fds.erase(it);  // 제거 후 다음 항목으로 이동
+        } else {
+            ++it;
+        }
+    }
+}
+
+/*
+	shouldExitServer()
+	- 서버 종료 판단
+	- 명확한 종료 조건 제공
+	- run() while 루프 조건으로 사용
+	- exitFlag 내부 상태 체크
+   - 신호 처리 등 확장 가능
+*/
+bool IrcServer::shouldExitServer() {
+    // 현재는 단순하지만, 나중에 확장 가능
+    // 예: signal handler가 설정한 플래그 체크
+    return false;  // 무한 루프 (신호에 의해서만 종료)
+}
+
+
+
+/*
+	canRecover(const ServerException& e)
+	- 서버 종료 판단
+	- catch 블록에서 에러 타입에 따라 계속할지 말지 판단하는 데 사용
+*/
+bool IrcServer::canRecover(const ServerException& e) {
+    std::string msg = e.what();
+    
+    // 복구 불가능한 에러
+    if (msg.find("socket") != std::string::npos ||
+        msg.find("bind") != std::string::npos ||
+        msg.find("listen") != std::string::npos) {
+        return false;  // 서버 자체의 문제 → 종료
+    }
+    
+    // 복구 가능한 에러 (클라이언트 관련)
+    // accept, read, write 에러는 무시하고 계속
+    return true;
 }

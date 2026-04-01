@@ -59,6 +59,18 @@ private:
 	std::map<std::string, Channel *>		_channels;
 	std::map<std::string, Client*>			nickNameClientMap;
 
+	/* Enhanced event handlers */
+	bool									processServerEvent();			// 새 클라이언트 연결 처리
+	bool									processClientRead(int fd);		// 클라이언트 읽기 처리 (bool 반환)
+	bool									processClientWrite(int fd);		// 클라이언트 쓰기 처리 (bool 반환)
+	
+	/* Cleanup helpers */
+	void									markClientForRemoval(int fd);	// fd를 제거 대상으로 표시
+	void									cleanupMarkedClients();			// 표시된 fd들을 정리
+	
+	/* State management */
+	bool									shouldExitServer();				// 서버 종료 여부 판단
+
 public:
 	IrcServer();
 	IrcServer(const char *port, const char *password);
@@ -102,6 +114,9 @@ public:
 		virtual ~ServerException() throw() {};
 		virtual const char*	 what() const throw();
 	};
+
+	/* Utility functions */
+	bool									canRecover(const ServerException& e);
 };
 
 #endif

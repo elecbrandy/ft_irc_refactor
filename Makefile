@@ -9,7 +9,7 @@ SRCS_MAIN = $(wildcard src/*.cpp)
 SRCS    = $(SRCS_MAIN) $(SRCS_CMD)
 HDRS    = $(wildcard src/*.hpp)
 OBJS    = $(SRCS:.cpp=.o)
-TEST_SCRIPT = tests/test_basic.py
+TEST_SCRIPT = test/test_basic.py
 
 # -------------------------------------------------------
 # Local Build
@@ -61,17 +61,15 @@ clean-docker:
 
 test: $(NAME)
 	@echo "$(GREEN)Starting local integration tests...$(RESET)"
-	@# 1. 혹시 이미 실행 중인 서버가 있다면 종료
 	@pkill $(NAME) || true
-	@# 2. 서버를 백그라운드에서 실행 (로그는 test_server.log에 기록)
+	@# 서버 실행 (로그를 터미널에 직접 쏘거나, 명확하게 리다이렉션)
 	@./$(NAME) $(IRC_PORT) $(IRC_PASSWORD) > test_server.log 2>&1 & \
 		SERVER_PID=$$!; \
 		echo "Server started with PID: $$SERVER_PID"; \
-		sleep 1; \
-		# 3. 파이썬 테스트 실행 \
+		sleep 2; \
 		python3 $(TEST_SCRIPT); \
 		TEST_EXIT_CODE=$$?; \
-		# 4. 테스트 종료 후 서버 프로세스 정리 \
+		echo "Test finished with exit code: $$TEST_EXIT_CODE"; \
 		kill $$SERVER_PID; \
 		exit $$TEST_EXIT_CODE
 
