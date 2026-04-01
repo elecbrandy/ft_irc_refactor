@@ -21,7 +21,7 @@
 # include "Channel.hpp"
 # include "ServerMsg.hpp"
 # include "ReplyCode.hpp"
-# include "Cmd/Cmd.hpp"
+# include "Cmd.hpp"
 
 # define MAX_CLIENTS 20
 # define BUFFER_SIZE 513
@@ -58,7 +58,6 @@ private:
 	std::map<int, Client*>					_clients;
 	std::map<std::string, Channel *>		_channels;
 	std::map<std::string, Client*>			nickNameClientMap;
-	std::vector<int>						_fdsToRemove;
 
 public:
 	IrcServer();
@@ -77,14 +76,13 @@ public:
 	void									init();
 	void									acceptClient();
 	void									run();
-	void									handleSocketRead(int fd);
-	void									handleSocketWrite(int fd);
+	bool									handleSocketRead(int fd);
+	bool									handleSocketWrite(int fd);
 	void									checkPingTimeOut();
 	std::string								makeMsg(const std::string& prefix, const std::string& msg);
 	void									castMsg(int client_fd, const std::string message);
 	void									broadcastMsg(const std::string& message, Channel* channel, int senderFd);
 	void									removeChannel(const std::string channelName);
-	void									removeClientFd(int client_fd);
 	void									removeClientFromServer(Client* client);
 	void									addClientByNickname(const std::string& nickname, Client* client);
 	void									updateClients(Client* client);

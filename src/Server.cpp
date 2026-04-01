@@ -160,66 +160,71 @@ void IrcServer::checkPingTimeOut() {
 }
 
 void IrcServer::run() {
-	bool exitFlag = false;
-	while (true) {
-		try {
-			checkPingTimeOut();
+    bool exitFlag = false;
+    while (true) {
+        try {
+            checkPingTimeOut();
 
-			int timeout_ms = 1000; // 1000ms = 1초
-			if (poll(&_fds[0], _fds.size(), timeout_ms) < 0) {
-				if (errno != EINTR) {
-					exitFlag = true;
-				}
-				throw ServerException(ERR_POLL);
-			}
+            int timeout_ms = 1000; // 1000ms = 1초
+            if (poll(&_fds[0], _fds.size(), timeout_ms) < 0) {
+                if (errno != EINTR) {
+                    exitFlag = true;
+                }
+                throw ServerException(ERR_POLL);
+            }
 
-			for (int i = _fds.size() - 1; i>= 0; --i) {
-				// POLLIN event
-				if (_fds[i].revents & POLLIN) {
-					if (_fds[i].fd == this->_fd) {
-						// Another(client) fd
-						acceptClient();
-					} else {
-						// Another(client) fd
-						handleSocketRead(_fds[i].fd); 
+            for (int i = _fds.size() - 1; i >= 0; --i) {
+                int current_fd = _fds[i].fd;
+                
+                // 이미 삭제된(-1) 소켓이거나 이벤트가 발생하지 않았으면 스킵
+                if (current_fd < 0 || _fds[i].revents == 0) {
+                    continue; 
+                }
 
-						// Add to remove list if Client Shutdown
-						if (getClient(_fds[i].fd) == NULL) { 
-							_fdsToRemove.push_back(_fds[i].fd);
-						}
-					}
-				}
+                // 1. 서버 소켓 (새 연결 요청)
+                if (current_fd == this->_fd) {
+                    if (_fds[i].revents & POLLIN) {
+                        acceptClient();
+                    }
+                    continue;
+                }
 
-				// POLLOUT event
-				if (_fds[i].revents & POLLOUT) {
-					handleSocketWrite(_fds[i].fd);
-					
-					// Add to remove list if Client Shutdown
-					if (getClient(_fds[i].fd) == NULL) { 
-						_fdsToRemove.push_back(_fds[i].fd);
-					}
-				}
-			}
+                // 2. 클라이언트 소켓 (POLLIN: 데이터 수신)
+                if (_fds[i].revents & POLLIN) {
+                    handleSocketRead(current_fd);
+                }
 
-			// Remove Client fds
-			for (size_t j = 0; j < _fdsToRemove.size(); ++j) {
-				removeClientFd(_fdsToRemove[j]);
-			}
-			_fdsToRemove.clear();
+                // 3. 클라이언트 소켓 (POLLOUT: 데이터 송신)
+                // 앞선 handleSocketRead 도중 에러가 나서 removeClientFromServer가 
+                // 호출되었다면, _fds[i].fd는 -1로 변경되었을 것 -> 이를 확인하여 방어
+                if (_fds[i].fd != -1 && (_fds[i].revents & POLLOUT)) {
+                    handleSocketWrite(current_fd);
+                }
+            }
 
-		} catch (const ServerException& e) {
-			serverLog(this->_fd, LOG_ERR, C_ERR, e.what());
-			if (exitFlag) {
-				exit(EXIT_FAILURE);
-			}
-		}
-	}
+            // 루프 순회가 끝난 후, 무효화된(-1) fd들을 일괄적으로 삭제
+            for (std::vector<struct pollfd>::iterator it = _fds.begin(); it != _fds.end(); ) {
+                if (it->fd == -1) {
+                    it = _fds.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+
+        } catch (const ServerException& e) {
+            serverLog(this->_fd, LOG_ERR, C_ERR, e.what());
+            if (exitFlag) {
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
 }
 
-void IrcServer::handleSocketRead(int fd) {
+
+bool IrcServer::handleSocketRead(int fd) {
 	Client* client = getClient(fd);
 	if (!client) {
-		return;
+		return false;
 	}
 	char	buffer[BUFFER_SIZE];
 
@@ -227,27 +232,26 @@ void IrcServer::handleSocketRead(int fd) {
 	
 	// Recv error
 	if (recvLen <= 0) {
-		removeClientFromServer(getClient(fd));
-		return ;
+		return false;
 	}
 
 	buffer[recvLen] = '\0';
 	client->appendToRecvBuffer(buffer);
-
+	
 	std::string str;
-
 	while (getClient(fd) && client->extractMessage(str)) {
 		Cmd cmdHandler(*this, str, fd);
 		serverLog(fd, LOG_INPUT, C_MSG, str);
 		if (!cmdHandler.handleClientCmd())
-			return ;
+			return false;
 	}
+	return true;
 }
 
-void IrcServer::handleSocketWrite(int fd) {
+bool IrcServer::handleSocketWrite(int fd) {
 	Client* client = getClient(fd);
 	if (!client) {
-		return;
+		return false;
 	}
 
 	std::string& sendBuffer = client->getSendBuffer();
@@ -389,6 +393,7 @@ void IrcServer::removeClientFromServer(Client* client) {
 		return;
 	}
 
+	// 1. 참여 중인 채널에서 퇴장 처리 (기존과 동일)
 	for (std::map<std::string, Channel*>::iterator chs = _channels.begin(); chs != _channels.end(); ++chs) {
 		Channel* ch = chs->second;
 		if (ch->isParticipant(ch->isOperatorNickname(client->getNickname()))) {
@@ -399,14 +404,21 @@ void IrcServer::removeClientFromServer(Client* client) {
 		}
 	}
 
-	// 클라이언트를 _clients와 nickNameClientMap에서 제거
+	// 2. Map에서 클라이언트 제거
 	if (_clients.find(client->getFd()) != _clients.end()) {
 		_clients.erase(client->getFd());
 	}
 	nickNameClientMap.erase(client->getNickname());
 
-	_fdsToRemove.push_back(client->getFd());
+	// 3. pollfd 배열에서 해당 소켓을 무효화(-1로 설정)
+	for (size_t i = 0; i < _fds.size(); ++i) {
+		if (_fds[i].fd == client->getFd()) {
+			_fds[i].fd = -1; // 무효화
+			break;
+		}
+	}
 	
+	// 4. 로그 출력 및 자원 해제
 	serverLog(this->_fd, LOG_SERVER, C_ERR, MSG_END_CONNECTED(intToString(client->getFd())));
 	delete client;
 }
