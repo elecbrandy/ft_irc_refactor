@@ -1,4 +1,4 @@
-#include "Server.hpp"
+#include "../include/Server.hpp"
 
 static void signalHandler(int signal) {
 	(void)signal;

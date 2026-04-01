@@ -1,4 +1,4 @@
-#include "Cmd.hpp"
+#include "../../include/Cmd.hpp"
 
 Cmd::Cmd(IrcServer &s, std::string &msg, int client_fd)
 : server(s), client_fd(client_fd), client(server.getClient(client_fd)), msg(msg) {}

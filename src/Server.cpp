@@ -1,5 +1,5 @@
-#include "Server.hpp"
-#include "Client.hpp"
+#include "../include/Server.hpp"
+#include "../include/Client.hpp"
 
 IrcServer::IrcServer() {}
 
@@ -221,10 +221,10 @@ void IrcServer::run() {
 }
 
 
-bool IrcServer::handleSocketRead(int fd) {
+void IrcServer::handleSocketRead(int fd) {
 	Client* client = getClient(fd);
 	if (!client) {
-		return false;
+		return;
 	}
 	char	buffer[BUFFER_SIZE];
 
@@ -232,7 +232,7 @@ bool IrcServer::handleSocketRead(int fd) {
 	
 	// Recv error
 	if (recvLen <= 0) {
-		return false;
+		return;
 	}
 
 	buffer[recvLen] = '\0';
@@ -243,15 +243,14 @@ bool IrcServer::handleSocketRead(int fd) {
 		Cmd cmdHandler(*this, str, fd);
 		serverLog(fd, LOG_INPUT, C_MSG, str);
 		if (!cmdHandler.handleClientCmd())
-			return false;
+			return;
 	}
-	return true;
 }
 
-bool IrcServer::handleSocketWrite(int fd) {
+void IrcServer::handleSocketWrite(int fd) {
 	Client* client = getClient(fd);
 	if (!client) {
-		return false;
+		return;
 	}
 
 	std::string& sendBuffer = client->getSendBuffer();
@@ -468,15 +467,6 @@ void IrcServer::enablePollOutEvent(int client_fd) {
 	for (size_t i = 0; i < _fds.size(); ++i) {
 		if (_fds[i].fd == client_fd) {
 			_fds[i].events = (_fds[i].events | POLLOUT);
-			break;
-		}
-	}
-}
-
-void IrcServer::removeClientFd(int client_fd) {
-	for (size_t i = 0; i < _fds.size(); ++i) {
-		if (_fds[i].fd == client_fd) {
-			_fds.erase(_fds.begin() + i);
 			break;
 		}
 	}

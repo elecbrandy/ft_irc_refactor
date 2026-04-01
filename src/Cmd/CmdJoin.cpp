@@ -1,7 +1,7 @@
-#include "Cmd.hpp"
-#include "../Server.hpp"
-#include "../Channel.hpp"
-#include "../Client.hpp"
+#include "../../include/Cmd.hpp"
+#include "../../include/Server.hpp"
+#include "../../include/Channel.hpp"
+#include "../../include/Client.hpp"
 
 /*
 JOIN 명령어 : /join #채널명1(,#채널명2,...) (비밀번호1,비밀번호2,...)

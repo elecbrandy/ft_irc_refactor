@@ -76,8 +76,8 @@ public:
 	void									init();
 	void									acceptClient();
 	void									run();
-	bool									handleSocketRead(int fd);
-	bool									handleSocketWrite(int fd);
+	void									handleSocketRead(int fd);
+	void									handleSocketWrite(int fd);
 	void									checkPingTimeOut();
 	std::string								makeMsg(const std::string& prefix, const std::string& msg);
 	void									castMsg(int client_fd, const std::string message);

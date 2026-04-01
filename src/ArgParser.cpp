@@ -1,4 +1,4 @@
-#include "ArgParser.hpp"
+#include "../include/ArgParser.hpp"
 
 ArgParser::ArgParser() : port(-1), password(NULL) {}
 
