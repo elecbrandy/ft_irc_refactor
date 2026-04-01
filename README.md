@@ -13,13 +13,12 @@
 .
 ├── src/               # 소스 코드
 │   └── cmd/           # IRC 명령어 구현
+├── include/           # 헤더 파일
 ├── conf/              # 서버 설정 파일
-│   ├── motd.txt       # 접속 시 출력되는 MOTD
-│   └── goat.txt       # 서버 시작 시 출력되는 아스키아트
 ├── Makefile
-├── Dockerfile.server
+├── Dockerfile
 ├── docker-compose.yml
-└── .env               # 포트/패스워드 설정 (없으면 기본값 사용)
+└── .env
 ```
 
 <br>
@@ -90,6 +89,11 @@ nc localhost 6667
 | `make local-clean` | 오브젝트 파일 삭제 |
 | `make local-fclean` | 오브젝트 파일 + 바이너리 삭제 |
 | `make local-re` | 전체 재빌드 |
+
+### 3.3 테스트
+| 명령어 | 설명 |
+|---|---|
+| `make test` | python client 기반 테스트 |
 
 <br>
 <br>
