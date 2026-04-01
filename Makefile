@@ -1,31 +1,61 @@
-NAME = ircserv
+NAME    = ircserv
 
-CPP = c++
+CPP     = c++
 CPPFLAGS = -Wall -Wextra -Werror -std=c++98
 
-INCS = .
-SRCS_CMD = $(wildcard Cmd/*.cpp)
-SRCS_MAIN = $(wildcard *.cpp)
-SRCS = $(SRCS_MAIN) $(SRCS_CMD)
-HDRS = $(wildcard *.hpp)
-OBJS = $(SRCS:.cpp=.o)
+INCS    = .
+SRCS_CMD = $(wildcard src/Cmd/*.cpp)
+SRCS_MAIN = $(wildcard src/*.cpp)
+SRCS    = $(SRCS_MAIN) $(SRCS_CMD)
+HDRS    = $(wildcard src/*.hpp)
+OBJS    = $(SRCS:.cpp=.o)
 
-all : $(NAME)
+# -------------------------------------------------------
+# Local Build
+# -------------------------------------------------------
 
-$(NAME) : $(OBJS)
+all: $(NAME)
+
+$(NAME): $(OBJS)
 	$(CPP) $(CPPFLAGS) $(OBJS) -o $(NAME) -I$(INCS)
 
-%.o : %.cpp $(HDRS)
+%.o: %.cpp $(HDRS)
 	$(CPP) $(CPPFLAGS) -c $< -o $@
 
-clean :
+clean:
 	rm -f $(OBJS)
 
-fclean : clean
+fclean: clean
 	rm -f $(NAME)
 
-re :
-	$(MAKE) fclean
-	$(MAKE) all
+re: fclean all
 
-.PHONY : all clean fclean re
+# -------------------------------------------------------
+# Docker
+# -------------------------------------------------------
+
+# .env가 없을 경우 기본값 사용
+-include .env
+IRC_PORT     ?= 6667
+IRC_PASSWORD ?= password
+
+up:
+	IRC_PORT=$(IRC_PORT) IRC_PASSWORD=$(IRC_PASSWORD) docker compose up --build -d
+
+down:
+	IRC_PORT=$(IRC_PORT) IRC_PASSWORD=$(IRC_PASSWORD) docker compose down
+
+restart:
+	IRC_PORT=$(IRC_PORT) IRC_PASSWORD=$(IRC_PASSWORD) docker compose down
+	IRC_PORT=$(IRC_PORT) IRC_PASSWORD=$(IRC_PASSWORD) docker compose up --build -d
+
+log:
+	docker compose logs -f
+
+status:
+	docker compose ps
+
+clean-docker:
+	docker compose down --rmi all --volumes --remove-orphans
+
+.PHONY: all clean fclean re up down restart log status clean-docker

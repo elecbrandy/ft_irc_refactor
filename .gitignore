@@ -10,3 +10,11 @@ a.out
 *.swp
 ircserv
 legacy
+
+# sh
+*.sh
+
+# env
+*.env
+.env
+output.txt

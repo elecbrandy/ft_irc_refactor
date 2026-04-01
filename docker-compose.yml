@@ -1,0 +1,12 @@
+services:
+  ircserv:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: ircserv
+    env_file:
+      - .env
+    ports:
+      - "${IRC_PORT}:${IRC_PORT}"
+    restart: unless-stopped
+    tty: true
