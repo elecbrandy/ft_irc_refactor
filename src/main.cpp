@@ -14,6 +14,9 @@ int main(int ac, char** av) {
 		return 1;
 	}
 
+	// SIGPIPE 신호 무시 (클라이언트가 비정상적으로 연결 종료 시 발생)
+	signal(SIGPIPE, SIG_IGN);
+
 	// 서버 실행
 	try {
 		IrcServer server(av[1], av[2]);

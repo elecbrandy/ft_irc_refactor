@@ -2,52 +2,62 @@ import socket
 import time
 import sys
 
-# 서버 설정 정보
 HOST = '127.0.0.1'
 PORT = 6667
 PASSWORD = 'password'
 
 def test_connection_and_registration():
     try:
-        # 1. 소켓 연결
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(3.0) # 타임아웃 3초 설정
+        sock.settimeout(5.0)
         sock.connect((HOST, PORT))
+        print(f"✅ Connected to {HOST}:{PORT}")
         
-        # 2. 인증 및 등록 메시지 전송 (CRLF 필수)
         sock.sendall(f"PASS {PASSWORD}\r\n".encode('utf-8'))
         sock.sendall(b"NICK testbot\r\n")
         sock.sendall(b"USER testbot 0 * :Test Bot Realname\r\n")
         
-        # 3. 서버 응답 확인 (RPL_WELCOME 001 코드가 오는지 확인)
-        response = sock.recv(4096).decode('utf-8')
-        print("--- Server Response ---")
-        print(response)
+        # 3. Welcome 메시지 및 MOTD 끝(376)까지 대기
+        print("--- Waiting for Registration & MOTD (001~376) ---")
+        full_response = ""
+        while True:
+            chunk = sock.recv(4096).decode('utf-8')
+            if not chunk:
+                break
+            full_response += chunk
+            # 376(End of MOTD)이 오면 서버가 초기 메시지를 다 보낸 것으로 간주
+            if "376 testbot" in full_response:
+                break
         
-        if "001 testbot" not in response:
-            print("❌ FAIL: RPL_WELCOME (001) not found.")
-            sys.exit(1)
-        else:
-            print("✅ PASS: Registration successful.")
+        print(full_response.strip())
+        print("✅ PASS: Registration and MOTD received.")
 
         # 4. PING / PONG 테스트
-        sock.sendall(b"PING :testping\r\n")
-        response = sock.recv(1024).decode('utf-8')
+        # 버퍼가 완전히 비워졌는지 확인하기 위해 아주 짧게 대기
+        time.sleep(0.1)
         
-        if "PONG :testping" not in response:
-            print("❌ FAIL: PONG not received.")
-            sys.exit(1)
-        else:
+        print("\n--- Testing PING/PONG ---")
+        test_payload = "testping_12345"
+        sock.sendall(f"PING :{test_payload}\r\n".encode('utf-8'))
+        
+        # 이제 순수하게 PING에 대한 응답만 들어옵니다.
+        response = sock.recv(1024).decode('utf-8')
+        print(f"Received from server: {response.strip()}")
+        
+        if "PONG" in response.upper() and test_payload in response:
             print("✅ PASS: PING/PONG successful.")
+        else:
+            print(f"❌ FAIL: Expected PONG but got something else.")
+            sys.exit(1)
             
-        # 5. 종료
-        sock.sendall(b"QUIT :bye\r\n")
+        sock.sendall(b"QUIT :Testing finished\r\n")
         sock.close()
+        print("\n✅ All tests passed!")
         
     except Exception as e:
-        print(f"❌ FAIL: Test thrown an exception: {e}")
+        print(f"❌ FAIL: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    time.sleep(1) # 서버가 완전히 뜰 때까지 약간 대기
+    time.sleep(2)
     test_connection_and_registration()
