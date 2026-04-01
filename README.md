@@ -7,7 +7,7 @@
 <br>
 <br>
 
-## 프로젝트 구조
+## 1. 프로젝트 구조
 
 ``` bash
 .
@@ -25,9 +25,9 @@
 <br>
 <br>
 
-## 빠른 시작
+## 2. 빠른 시작
 
-### 1️⃣ 환경설정
+### 2.1. 환경설정
 
 - `.env` 파일을 생성해 포트와 패스워드를 지정
 - 파일이 없으면 기본값(`6667` / `password`)이 자동으로 사용됨
@@ -39,7 +39,7 @@ IRC_PASSWORD=password
 
 <br>
 
-### 2️⃣ 서버 실행
+### 2.2. 서버 실행
 
 ```bash
 make up
@@ -47,7 +47,7 @@ make up
 
 <br>
 
-### 3️⃣ IRC 클라이언트 접속
+### 2.3. IRC 클라이언트 접속
 
 - 서버가 실행된 후 아무 IRC 클라이언트로 접속
 
@@ -66,9 +66,9 @@ nc localhost 6667
 <br>
 <br>
 
-## 명령어
+## 3. 명령어
 
-### 1️⃣ Make 명령어 (Docker Container)
+### 3.1. Make 명령어 (Docker Container)
 
 | 명령어 | 설명 |
 |---|---|
@@ -81,7 +81,7 @@ nc localhost 6667
 
 <br>
 
-### 2️⃣ 로컬 빌드
+### 3.2. 로컬 빌드
 
 | 명령어 | 설명 |
 |---|---|
@@ -94,9 +94,9 @@ nc localhost 6667
 <br>
 <br>
 
-## 개발 관련
+## 4. 개발 관련
 
-### 1️⃣ Memory Leak Check
+### 4.1. Memory Leak Check
 
 ```bash
 while True; do leaks ircserv | grep leaked; sleep 1; done;
@@ -104,7 +104,7 @@ while True; do leaks ircserv | grep leaked; sleep 1; done;
 
 <br>
 
-### 2️⃣ 요구사항 체크리스트
+### 4.2. 요구사항 체크리스트
 
 - **Server 기본 구현**
   - [x] Client - Server 기본 연결
@@ -132,7 +132,7 @@ while True; do leaks ircserv | grep leaked; sleep 1; done;
 
 <br>
 
-### 3️⃣ 참고 사항
+### 4.3. 참고 사항
 
 - **`recv` 의 반환값**
   - 리눅스 `man` 페이지에 따르면, 논블로킹 소켓에서 `recv` 호출 시 읽을 데이터가 없으면 `-1`을 반환하고 `errno`에 `EAGAIN` 또는 `EWOULDBLOCK`을 설정함
