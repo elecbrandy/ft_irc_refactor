@@ -6,6 +6,7 @@
 # include <string>
 # include <vector>
 # include <map>
+# include <set>
 # include <cstring>
 # include <cstdlib>
 # include <sys/socket.h>
@@ -58,6 +59,7 @@ private:
 	std::map<int, Client*>					_clients;
 	std::map<std::string, Channel *>		_channels;
 	std::map<std::string, Client*>			nickNameClientMap;
+	std::set<int>							_toRemove;	// 제거 대기 fd (cleanup에서 일괄 teardown)
 
 	/* Enhanced event handlers */
 	bool									processServerEvent();			// 새 클라이언트 연결 처리
@@ -65,8 +67,8 @@ private:
 	bool									processClientWrite(int fd);		// 클라이언트 쓰기 처리 (bool 반환)
 	
 	/* Cleanup helpers */
-	void									markClientForRemoval(int fd);	// fd를 제거 대상으로 표시
-	void									cleanupMarkedClients();			// 표시된 fd들을 정리
+	void									cleanupMarkedClients();			// 표시된 fd들을 한 곳에서 일괄 teardown
+	bool									isMarkedForRemoval(int fd) const;	// 제거 대기 중인지 조회
 	
 	/* State management */
 	bool									shouldExitServer();				// 서버 종료 여부 판단
@@ -95,7 +97,8 @@ public:
 	void									castMsg(int client_fd, const std::string message);
 	void									broadcastMsg(const std::string& message, Channel* channel, int senderFd);
 	void									removeChannel(const std::string channelName);
-	void									removeClientFromServer(Client* client);
+	void									removeClientFromServer(Client* client);	// 실제 teardown (cleanupMarkedClients 전용)
+	void									markClientForRemoval(int fd);			// fd를 제거 대상으로 표시만 함 (즉시 삭제 X)
 	void									addClientByNickname(const std::string& nickname, Client* client);
 	void									updateClients(Client* client);
 	void									updateNickNameClientMap(const std::string& oldNick, const std::string& newNick, Client* client);

@@ -134,6 +134,7 @@ void IrcServer::acceptClient() {
 	struct pollfd client_poll_fd;
 	client_poll_fd.fd = client_fd;
 	client_poll_fd.events = POLLIN;
+	client_poll_fd.revents = 0;	// garbage revents로 같은 루프에서 처리되는 것 방지
 	_fds.push_back(client_poll_fd);
 
 	Client* newClient = new Client(client_addr.sin_addr);
@@ -155,7 +156,7 @@ void IrcServer::checkPingTimeOut() {
 	for (size_t i = 0; i < clientsToRemove.size(); ++i) {
 		Client* client = clientsToRemove[i];
 		serverLog(client->getFd(), LOG_SERVER, C_ERR, "Ping timeout. Disconnecting client " + intToString(client->getFd()));
-		removeClientFromServer(client);
+		markClientForRemoval(client->getFd());
 	}
 }
 
@@ -203,7 +204,14 @@ void IrcServer::run() {
                 if (current_fd != -1 && (_fds[i].revents & POLLOUT)) {
                     if (!processClientWrite(current_fd)) {
                         markClientForRemoval(current_fd);
+                        continue;
                     }
+                }
+
+                // 에러/연결 종료 이벤트 정리 (읽기/쓰기 시도 후에도 남은 경우)
+                current_fd = _fds[i].fd;
+                if (current_fd != -1 && (_fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))) {
+                    markClientForRemoval(current_fd);
                 }
             }
  
@@ -290,7 +298,8 @@ void IrcServer::castMsg(int client_fd, const std::string msg) {
 			enablePollOutEvent(client_fd);
 		} else if (errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN) {
 			// Error: another reasons
-			removeClientFromServer(client);
+			// 마킹만 → broadcastMsg 순회 중인 _clients/participant 맵을 erase하지 않음 (반복자 무효화 방지)
+			markClientForRemoval(client_fd);
 		}
 
 	// Only partial data was sent
@@ -519,8 +528,9 @@ bool IrcServer::processClientRead(int fd) {
     client->appendToRecvBuffer(buffer);
     
     // 메시지 추출 및 처리
+    // 지연 삭제: QUIT 등으로 마킹되면 getClient는 아직 NULL이 아니므로 마킹 여부도 검사
     std::string str;
-    while (getClient(fd) && client->extractMessage(str)) {
+    while (getClient(fd) && !isMarkedForRemoval(fd) && client->extractMessage(str)) {
 		try {
 			Cmd cmdHandler(*this, str, fd);
 			serverLog(fd, LOG_INPUT, C_MSG, str);
@@ -559,8 +569,7 @@ bool IrcServer::processClientWrite(int fd) {
             // 부분 또는 전체 전송 성공
             sendBuffer.erase(0, sendLen);
         } else if (sendLen == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            // 복구 불가능한 에러
-            removeClientFromServer(client);
+            // 복구 불가능한 에러 → 호출부(run)가 markClientForRemoval로 처리
             return false;
         }
         // EAGAIN/EWOULDBLOCK은 무시하고 나중에 재시도
@@ -579,52 +588,62 @@ bool IrcServer::processClientWrite(int fd) {
     return true;  // 정상 처리
 }
 
-/* 
+/*
 	markClientForRemoval(int fd)
-	- 클라이언트 제거 표시
-	- fd를 제거 대상으로 표시 (즉시 삭제하지 않음)
-   	- cleanup 단계에서 일괄 처리
-		- 루프 중간에 _clients 수정 안 함
-   		- 인덱스 변경 없음
-   		- 타이밍 이슈 방지
+	- 클라이언트를 "제거 대상"으로 표시만 한다 (즉시 삭제 X).
+	- 실제 teardown(채널 퇴장 / 맵 erase / delete)은 cleanupMarkedClients()가 전담.
+	- 모든 삭제 경로(castMsg, checkPingTimeOut, 명령 처리, run 루프)가 이 함수로 수렴 →
+	  순회 중인 _clients/participant 맵을 erase하지 않으므로 반복자 무효화/use-after-free 차단.
+	- 멱등: 이미 마킹된 fd면 아무것도 하지 않는다.
 */
 void IrcServer::markClientForRemoval(int fd) {
-	Client* client = getClient(fd);
-	if (!client)
+	if (!getClient(fd))
 		return ;
+	if (_toRemove.find(fd) != _toRemove.end())
+		return ;	// 이미 마킹됨
 
+	_toRemove.insert(fd);
 	serverLog(fd, LOG_SERVER, C_WARN, "Marking client for removal: " + intToString(fd));
 
-    // _fds에서 해당 fd의 항목을 찾아 -1로 표시
-    for (size_t i = 0; i < _fds.size(); ++i) {
-        if (_fds[i].fd == fd) {
-            _fds[i].fd = -1;  // 마킹
-            break;
-        }
-    }
-    removeClientFromServer(getClient(fd));  // 클라이언트 제거 처리 (채널 퇴장 등)
+	// _fds에서 해당 fd의 항목을 -1로 무효화 (poll 대상에서 제외, cleanup에서 압축)
+	for (size_t i = 0; i < _fds.size(); ++i) {
+		if (_fds[i].fd == fd) {
+			_fds[i].fd = -1;
+			break;
+		}
+	}
 }
 
+bool IrcServer::isMarkedForRemoval(int fd) const {
+	return _toRemove.find(fd) != _toRemove.end();
+}
 
 /* ========================================
-   5. cleanupMarkedClients() - 제거 대상 정리
-   
+   cleanupMarkedClients() - 제거 대상 일괄 정리 (유일한 teardown 지점)
+
    목적:
-   - markClientForRemoval()로 표시된 fd 정리
-   - _clients와 _fds 동시 정리
-   
+   - markClientForRemoval()로 표시된 fd를 실제로 삭제 (채널/맵/delete)
+   - 마지막에 _fds의 -1 슬롯을 압축
+
    호출 시점:
-   - run() 루프의 폴 순회 완료 후
-   - 모든 fd 접근이 완료된 후에만 호출
+   - run() 루프의 폴 순회가 완전히 끝난 후 한 번만
+   - 모든 맵 순회가 끝난 시점이라 erase가 안전
    ======================================== */
-
 void IrcServer::cleanupMarkedClients() {
-    // 1. _fds에서 -1인 항목 제거
-    std::vector<struct pollfd>::iterator it = _fds.begin();
+    // 1. 마킹된 클라이언트 실제 teardown (채널 퇴장 + 맵 erase + delete)
+    for (std::set<int>::iterator it = _toRemove.begin(); it != _toRemove.end(); ++it) {
+        Client* client = getClient(*it);
+        if (client) {
+            removeClientFromServer(client);
+        }
+    }
+    _toRemove.clear();
 
+    // 2. _fds에서 -1인 슬롯 압축
+    std::vector<struct pollfd>::iterator it = _fds.begin();
     while (it != _fds.end()) {
         if (it->fd == -1) {
-            it = _fds.erase(it);  // 제거 후 다음 항목으로 이동
+            it = _fds.erase(it);
         } else {
             ++it;
         }

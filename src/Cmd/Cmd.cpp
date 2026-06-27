@@ -67,7 +67,7 @@ bool Cmd::handleClientCmd() {
 	} catch (const CmdException& e) {
 		server.castMsg(client_fd, e.what());
 		if (!client->getPassStatus() || !client->getRegisteredStatus()) {
-			server.removeClientFromServer(client);
+			server.markClientForRemoval(client_fd);	// 지연 삭제: cleanupMarkedClients가 정리
 		}
 		return false;
 	}
