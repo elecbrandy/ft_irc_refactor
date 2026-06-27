@@ -227,8 +227,8 @@ void IrcServer::handleSocketRead(int fd) {
 	}
 	char	buffer[BUFFER_SIZE];
 
-	size_t recvLen = recv(fd, buffer, BUFFER_SIZE - 1, 0);
-	
+	ssize_t recvLen = recv(fd, buffer, BUFFER_SIZE - 1, 0);
+
 	// Recv error
 	if (recvLen <= 0) {
 		return;
@@ -508,8 +508,8 @@ bool IrcServer::processClientRead(int fd) {
     }
 
     char buffer[BUFFER_SIZE];
-    size_t recvLen = recv(fd, buffer, BUFFER_SIZE - 1, 0);
-    
+    ssize_t recvLen = recv(fd, buffer, BUFFER_SIZE - 1, 0);
+
     // 연결 종료 또는 에러
     if (recvLen <= 0) {
 		return false;  // 클라이언트 제거 필요

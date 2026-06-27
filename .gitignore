@@ -19,3 +19,4 @@ legacy
 .env
 output.txt
 *.log
+*.md

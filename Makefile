@@ -9,7 +9,7 @@ SRCS_MAIN = $(wildcard src/*.cpp)
 SRCS    = $(SRCS_MAIN) $(SRCS_CMD)
 HDRS    = $(wildcard src/*.hpp)
 OBJS    = $(SRCS:.cpp=.o)
-TEST_SCRIPT = test/test_basic.py
+TEST_SCRIPT = test/run_all.py
 
 # -------------------------------------------------------
 # Local Build
@@ -30,6 +30,11 @@ fclean: clean
 	rm -f $(NAME)
 
 re: fclean all
+
+# 메모리 안전망: 메인 루프/생명주기 작업 시에만 사용 (use-after-free 탐지)
+# -std=c++98 은 유지하되 sanitizer 만 얹는다. 평소 빌드/평가에는 쓰지 않음.
+asan: fclean
+	$(MAKE) all CPPFLAGS="-Wall -Wextra -std=c++98 -g -fsanitize=address,undefined"
 
 # -------------------------------------------------------
 # Docker
@@ -73,4 +78,4 @@ test: $(NAME)
 		kill $$SERVER_PID; \
 		exit $$TEST_EXIT_CODE
 
-.PHONY: all clean fclean re up down restart log status clean-docker
+.PHONY: all clean fclean re asan test up down restart log status clean-docker
