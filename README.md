@@ -1,62 +1,102 @@
-# ft_irc_refactor
+# ft_irc
 
-> 이 Repository는 `2024.10-11` 진행했던 [ft_irc](https://github.com/elecbrandy/ft_irc) 프로젝트를 리팩토링하기 위해 제작되었습니다.
+![ft_irc_refactor main image](./img/irc_main.png)
 
-`ft_irc`는 [IRC(Internet Relay Chat)](https://en.wikipedia.org/wiki/Internet_Relay_Chat) 프로토콜을 직접 구현하는 프로젝트입니다. 이 프로젝트의 목표는 **소켓 프로그래밍과 네트워크 프로토콜의 기본 원리를 이해** 하고, 클라이언트-서버 구조, 멀티플렉싱, 채널/사용자 관리 및 명령어 처리 로직을 직접 구현하는 것입니다.
+<br>
+
+## 📌 Overview
+
+> _**Internet Relay Chat**_
+
+- **프로젝트 목표**: C++98 기반 IRC 서버의 구조 개선, 메모리 안정성 확보, 테스트 자동화
+- **주요 범위**: `poll()` 기반 이벤트 루프, IRC 명령어 처리, 채널/사용자 상태 관리
 
 <br>
 <br>
 
-## 1. 프로젝트 구조
+## 🧩 `ft_irc_refactor` 란?
 
-``` bash
+- **`ft_irc_refactor`** 는 `2024.10-11` 진행했던 `ft_irc` 프로젝트를 리팩토링하기 위해 제작된 저장소입니다.
+- `ft_irc`는 [IRC(Internet Relay Chat)](https://en.wikipedia.org/wiki/Internet_Relay_Chat) 프로토콜을 직접 구현하는 프로젝트입니다.
+- 이 저장소는 소켓 프로그래밍과 네트워크 프로토콜의 기본 구조를 유지하면서, 클라이언트 생명주기와 채널 상태 관리 로직을 더 안전하게 정리하는 것을 목표로 합니다.
+
+<br>
+<br>
+
+## 🏗️ System Architecture
+
+![ft_irc_refactor system architecture](./img/irc_arch.png)
+
+`ircserv`는 단일 스레드 이벤트 기반 IRC 서버입니다. 모든 클라이언트 I/O는 하나의 `poll()` 루프에서 처리되고, IRC 명령어는 `Cmd` 계층에서 파싱 및 실행됩니다. 서버 상태는 메모리에만 존재하며, 클라이언트와 채널 정보가 단일 source of truth 역할을 합니다.
+
+| Layer | Responsibility |
+|---|---|
+| I/O | 클라이언트 접속 수락, non-blocking read/write, send buffer 관리 |
+| Protocol | IRC 메시지 파싱, 명령어 dispatch, numeric reply 생성 |
+| State | 클라이언트, 채널, 닉네임 인덱스, 채널 모드 관리 |
+
+<br>
+<br>
+
+## 📂 Project Structure
+
+```bash
 .
-├── src/               # 소스 코드
-│   └── cmd/           # IRC 명령어 구현
+├── src/               # 서버 구현 및 IRC 명령어 처리
+│   └── Cmd/           # PASS, NICK, USER, JOIN, MODE 등 명령어 구현
 ├── include/           # 헤더 파일
-├── conf/              # 서버 설정 파일
+├── conf/              # MOTD 등 서버 설정 파일
+├── docs/              # 아키텍처 및 리팩토링 기록
+├── img/               # README 이미지
+├── test/              # Python 기반 통합 테스트
 ├── Makefile
 ├── Dockerfile
-├── docker-compose.yml
-└── .env
+└── docker-compose.yml
 ```
 
 <br>
 <br>
 
-## 2. 빠른 시작
+## 🛠️ Tech Stack
 
-### 2.1. 환경설정
+| Area | Stack |
+|---|---|
+| Language | C++98 |
+| Network I/O | TCP socket, non-blocking I/O, `poll()` |
+| Build | Makefile |
+| Test | Python integration test |
+| Runtime | Local binary, Docker Compose |
+| Debug | AddressSanitizer, UndefinedBehaviorSanitizer, `leaks` |
 
-- `.env` 파일을 생성해 포트와 패스워드를 지정
-- 파일이 없으면 기본값(`6667` / `password`)이 자동으로 사용됨
+<br>
+<br>
+
+## 🚀 Quick Start
+
+### 1. 환경 설정
+
+`.env` 파일을 생성해 포트와 패스워드를 지정할 수 있습니다. 파일이 없으면 기본값 `6667` / `password`가 사용됩니다.
 
 ```dotenv
 IRC_PORT=6667
 IRC_PASSWORD=password
 ```
 
-<br>
-
-### 2.2. 서버 실행
+### 2. Docker로 실행
 
 ```bash
 make up
 ```
 
-<br>
+### 3. IRC 클라이언트 접속
 
-### 2.3. IRC 클라이언트 접속
-
-- 서버가 실행된 후 아무 IRC 클라이언트로 접속
-
-``` bash
+```bash
 Host     : localhost
-Port     : 6667  (또는 .env에 지정한 포트)
-Password : password  (또는 .env에 지정한 패스워드)
+Port     : 6667
+Password : password
 ```
 
-- 또는 `nc`로 빠르게 연결 테스트
+`nc`로도 빠르게 연결을 확인할 수 있습니다.
 
 ```bash
 nc localhost 6667
@@ -65,87 +105,64 @@ nc localhost 6667
 <br>
 <br>
 
-## 3. 명령어
+## ⚙️ Commands
 
-### 3.1. Make 명령어 (Docker Container)
+### Docker
 
-| 명령어 | 설명 |
+| Command | Description |
 |---|---|
-| `make up` | 이미지 빌드 후 서버 시작 (백그라운드) |
+| `make up` | 이미지 빌드 후 서버 시작 |
 | `make down` | 서버 중지 및 컨테이너 제거 |
 | `make restart` | 서버 재빌드 후 재시작 |
-| `make log` | 실시간 로그 출력 (`Ctrl+C`로 종료) |
+| `make log` | 실시간 로그 출력 |
 | `make status` | 컨테이너 상태 확인 |
 | `make clean-docker` | 컨테이너, 이미지, 볼륨 전체 삭제 |
 
-<br>
+### Local
 
-### 3.2. 로컬 빌드
-
-| 명령어 | 설명 |
+| Command | Description |
 |---|---|
-| `make local-build` | 바이너리 빌드 |
-| `make local-run` | 빌드 후 바로 실행 |
-| `make local-clean` | 오브젝트 파일 삭제 |
-| `make local-fclean` | 오브젝트 파일 + 바이너리 삭제 |
-| `make local-re` | 전체 재빌드 |
+| `make` | `ircserv` 바이너리 빌드 |
+| `make re` | 전체 재빌드 |
+| `make clean` | 오브젝트 파일 삭제 |
+| `make fclean` | 오브젝트 파일과 바이너리 삭제 |
+| `make asan` | AddressSanitizer / UBSan 옵션으로 빌드 |
+| `make test` | Python 기반 통합 테스트 실행 |
 
-### 3.3 테스트
-| 명령어 | 설명 |
+<br>
+<br>
+
+## 💬 Supported IRC Features
+
+| Category | Features |
 |---|---|
-| `make test` | python client 기반 테스트 |
+| Registration | `PASS`, `NICK`, `USER`, registration state 관리 |
+| Connection | `PING`, `QUIT`, timeout, partial packet buffering |
+| Channel | `JOIN`, `PART`, channel participant/operator 관리 |
+| Messaging | `PRIVMSG`, channel broadcast, direct message |
+| Operator | `KICK`, `INVITE`, `TOPIC`, `MODE` |
+| Channel Mode | `+i`, `+t`, `+k`, `+o`, `+l` |
 
 <br>
 <br>
 
-## 4. 개발 관련
+## 🧪 Refactoring Focus
 
-### 4.1. Memory Leak Check
-
-```bash
-while True; do leaks ircserv | grep leaked; sleep 1; done;
-```
-
-<br>
-
-### 4.2. 요구사항 체크리스트
-
-- **Server 기본 구현**
-  - [x] Client - Server 기본 연결
-  - [x] 닉네임 및 사용자명 설정 가능
-  - [x] 수신받은 패킷 이어 붙이기 (`com^Dman^Dd`)
-- **Cmd**
-  - [x] `PASS`
-  - [x] `USER`
-  - [x] `PING`
-  - [x] `NICK`
-- **Channel 기본 구현**
-  - [x] 클라이언트 채널 참여 가능
-  - [x] 클라이언트가 채널에 보낸 모든 메세지는 같은 채널에 속한 다른 클라이언트에게 전달
-  - [x] 클라이언트는 운영자(`operators`) / 일반 사용자(`regular users`)로 구분
-- **Channel 내 `operators` 전용 명령어**
-  - [x] `KICK` : 채널에서 클라 강제퇴장
-  - [x] `INVITE` : 특정 클라를 채널로 초대
-  - [x] `TOPIC` : 채널 주제 변경/조회
-  - [x] `MODE` : 채널 모드 설정/변경
-    - `i` : 초대 전용 채널 설정/해제  
-    - `t` : 운영자만 채널 주제 변경 가능  
-    - `k` : 채널 비밀번호 설정/해제  
-    - `o` : 운영자 권한 부여/박탈  
-    - `l` : 채널 인원 제한 설정/해제
+| Area | Summary |
+|---|---|
+| Client lifecycle | 모든 삭제 경로를 mark 후 단일 cleanup 지점에서 정리하도록 개선 |
+| Non-blocking output | partial write와 `EAGAIN` 상황을 send buffer로 처리 |
+| Channel state | participant key를 순수 닉네임으로 통일하고 operator 상태를 별도 관리 |
+| Error handling | 등록된 클라이언트의 명령어 에러가 연결 종료로 이어지지 않도록 수정 |
+| Test safety net | 등록, 운영자 명령, 생명주기 테스트를 Python runner로 자동화 |
 
 <br>
-
-### 4.3. 참고 사항
-
-- **`recv` 의 반환값**
-  - 리눅스 `man` 페이지에 따르면, 논블로킹 소켓에서 `recv` 호출 시 읽을 데이터가 없으면 `-1`을 반환하고 `errno`에 `EAGAIN` 또는 `EWOULDBLOCK`을 설정함
-  - 읽기(`recv`): 수신 버퍼에 데이터가 없을 때 `-1` 반환 + `errno = EAGAIN` 설정
-  - 쓰기(`send`): 송신 버퍼가 가득 차 있을 때 `-1` 반환 + `errno = EAGAIN` 설정
-  - 대처 방법: 이벤트 루프에서 대기 후 재시도
-- **POLLIN과 POLLOUT**
-  - `POLLIN` 값: `0x0001` (이진수 `0001`)
-  - `POLLOUT` 값: `0x0004` (이진수 `0100`)
-  - `POLLIN | POLLOUT = 0x0005`
-
 <br>
+
+## 👥 Team
+
+| 팀원 | 김동우 | 김세진 | 최란 |
+|---|---|---|---|
+| 역할 | `Server / Infra` | `CMD / Option` | `Channel / User` |
+
+_*사람이 작성함_
