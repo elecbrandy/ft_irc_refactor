@@ -46,15 +46,14 @@ void Cmd::cmdPart() {
 
         // 채널은 존재하지만 사용자가 해당 채널에 참여하지 않은 경우
         Channel* ch = chs[chName];
-        std::string n = ch->isOperatorNickname(this->client->getNickname());
-        if (ch->getParticipant().find(n) == ch->getParticipant().end()) {
+        if (ch->getParticipant().find(this->client->getNickname()) == ch->getParticipant().end()) {
             server.castMsg(client_fd, server.makeMsg(PREFIX_SERVER, ERR_NOTONCHANNEL(client->getNickname(), chName)));
             continue ;
         }
 
         // 채널에서 나간다고 채널의 모든 참여자에게 알람 후 채널에서 사용자를 제거
         server.broadcastMsg(server.makeMsg(client->getPrefix(), RPL_PART(chName)), ch, -1);
-        ch->removeParticipant(ch->isOperatorNickname(client->getNickname()));
+        ch->removeParticipant(client->getNickname());
 
         // add : sejkim2 (participant 목록 갱신 후 operator 목록도 갱신)
         if (ch->isOperator(client->getNickname()) == true)

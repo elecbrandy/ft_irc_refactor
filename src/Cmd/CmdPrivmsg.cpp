@@ -146,8 +146,7 @@ void Cmd::cmdPrivmsg() {
 				throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_NOSUCHNICK(client->getNickname(), receivers[i])));
 
 			//채널에 참여하고 있는지 확인
-			std::string nick = it->second->isOperatorNickname(client->getNickname());
-			if (it->second->getParticipant().find(nick) == it->second->getParticipant().end())
+			if (it->second->getParticipant().find(client->getNickname()) == it->second->getParticipant().end())
 				throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_CANNOTSENDTOCHAN(client->getNickname(), receivers[i])));
 		} else { // 수신자집단이 사용자인 경우
 			Client* receiver = server.getClient(receivers[i]);

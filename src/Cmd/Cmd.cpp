@@ -62,14 +62,19 @@ bool Cmd::handleClientCmd() {
 			cmdTopic();
 		else if (cmd == "QUIT")
 			cmdQuit();
-		else
-			return false;
+		else {
+			// 알 수 없는 명령: 421 에러 reply만 보내고 연결은 유지 (등록 여부 무관)
+			server.castMsg(client_fd, server.makeMsg(PREFIX_SERVER, ERR_UNKNOWNCOMMAND(client->getNickname(), cmd)));
+			return true;
+		}
 	} catch (const CmdException& e) {
 		server.castMsg(client_fd, e.what());
+		// 미등록(PASS/등록 미완료) 클라이언트만 끊는다. 등록된 클라이언트는 에러 reply만 보내고 유지.
 		if (!client->getPassStatus() || !client->getRegisteredStatus()) {
 			server.markClientForRemoval(client_fd);	// 지연 삭제: cleanupMarkedClients가 정리
+			return false;
 		}
-		return false;
+		return true;
 	}
 	return true;
 }

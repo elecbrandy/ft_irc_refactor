@@ -82,7 +82,7 @@ void Cmd::cmdKick() {
 	Channel* ch = it->second;
 
 	// 명령어를 호출한 클라이언트가 채널에 참여한 클라이언트가 아닌경우
-	if (ch->getParticipant().find(ch->isOperatorNickname(client->getNickname())) == ch->getParticipant().end())
+	if (ch->getParticipant().find(client->getNickname()) == ch->getParticipant().end())
 		throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_NOTONCHANNEL(client->getNickname(), chName)));
 
 	// 채널 오퍼레이터 권한이 없는 경우
@@ -90,14 +90,14 @@ void Cmd::cmdKick() {
 		throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_CHANOPRIVSNEEDED(client->getNickname(), chName)));
 
 	// 강퇴시킬 사용자가 채널의 참여자가 아닌 경우
-	if (ch->getParticipant().find(ch->isOperatorNickname(target)) == ch->getParticipant().end())
+	if (ch->getParticipant().find(target) == ch->getParticipant().end())
 		throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_USERNOTINCHANNEL(client->getNickname(), target, chName)));
 	
 	// 강퇴 되었다고 채널의 모든 참여자(강퇴 대상자 포함)에게 알림 (-1: 강퇴자 포함 채널의 모든 참여자에게 알림)
 	server.broadcastMsg(server.makeMsg(client->getPrefix(), RPL_KICK(chName, target, comment)), ch, -1);
 	
 	// 알림 발송 됐으면 강퇴
-	ch->removeParticipant(ch->isOperatorNickname(target));
+	ch->removeParticipant(target);
 
 	// add : sejkim2 (운영자일 경우 운영자 목록에서도 삭제)
 	// fix : sejkim2 (client->getNickname이 아니라 target이 나가아 함)

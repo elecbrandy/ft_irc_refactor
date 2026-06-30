@@ -403,8 +403,8 @@ void IrcServer::removeClientFromServer(Client* client) {
 	// 1. 참여 중인 채널에서 퇴장 처리 (기존과 동일)
 	for (std::map<std::string, Channel*>::iterator chs = _channels.begin(); chs != _channels.end(); ++chs) {
 		Channel* ch = chs->second;
-		if (ch->isParticipant(ch->isOperatorNickname(client->getNickname()))) {
-			ch->removeParticipant(ch->isOperatorNickname(client->getNickname()));
+		if (ch->isParticipant(client->getNickname())) {
+			ch->removeParticipant(client->getNickname());
 		}
 		if (ch->isOperator(client->getNickname())) {
 			ch->removeOperator(client->getNickname());

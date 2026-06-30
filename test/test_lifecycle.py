@@ -28,7 +28,7 @@ def register(nick, wait_token="001"):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(5.0)
     s.connect((HOST, PORT))
-    s.sendall(f"PASS {PASSWORD}\r\nNICK {nick}\r\nUSER {nick} 0 * :{nick}\r\n".encode())
+    s.sendall(f"PASS {PASSWORD}\r\nNICK {nick}\r\nUSER {nick} 0 * :churn bot\r\n".encode())
     buf = ""
     while wait_token not in buf:
         chunk = s.recv(4096).decode(errors="ignore")

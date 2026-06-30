@@ -10,21 +10,13 @@
     params : [o : nickname / l : size / k : password]
 */
 
-void printParam(std::vector<std::string> param)
-{
-    std::cout << "this is start" << '\n';
-    for(std::vector<std::string>::iterator it = param.begin(); it != param.end(); it++)
-        std::cout << *it << "\n";
-    std::cout << "this is end" << '\n';
-}
-
 // option +-o
 void Cmd::validationNickName(std::string nickname, Channel* channel, int plus_flag)
 {
     //해당 클라이언트가 채널에 없음
     if (plus_flag == 1)
     {
-        if (channel->isParticipant(channel->isOperatorNickname(nickname)) == false)
+        if (channel->isParticipant(nickname) == false)
             throw CmdException(server.makeMsg(PREFIX_SERVER, ERR_USERNOTINCHANNEL(this->client->getNickname(), nickname, channel->getName())));
     }
     else
@@ -80,12 +72,8 @@ void Cmd::addChannelOperator(std::string nickname, Channel* channel)
 {
     std::map<std::string, Client*> map = this->server.getNickNameClientMap();
     std::map<std::string, Client*>::iterator client = map.find(nickname);
-    
-    //client->option_o (flag = 1)
-    std::string nick = "@" + nickname;
-    channel->removeParticipant(nickname);
-    channel->addParticipant(nick, client->second);
 
+    //client->option_o (flag = 1) — 운영자 판정은 _operator 셋에서만
     channel->setMode('o');
     channel->addOperator(nickname, client->second);
 }
@@ -93,14 +81,7 @@ void Cmd::addChannelOperator(std::string nickname, Channel* channel)
 // #ch -o user
 void Cmd::removeChannelOperator(std::string nickname, Channel* channel)
 {
-    std::map<std::string, Client*> map = this->server.getNickNameClientMap();
-    std::map<std::string, Client*>::iterator client = map.find(nickname);
-    
-    //client->option_o (flag = 0)
-    std::string nick = "@" + nickname;
-    channel->removeParticipant(nick);
-    channel->addParticipant(nickname, client->second);
-
+    //client->option_o (flag = 0) — 운영자 판정은 _operator 셋에서만
     channel->removeMode('o');
     channel->removeOperator(nickname);
 }
@@ -288,7 +269,7 @@ void Cmd::cmdMode()
         throw CmdException(server.makeMsg(PREFIX_SERVER, ERR_NOSUCHCHANNEL(this->client->getNickname(), modeParse[0])));
     //호출자가 현재 채널에 참여하고 있는가
     std::map<std::string, Client*> participaciant = channel->second->getParticipant();
-    if (participaciant.find(channel->second->isOperatorNickname(this->client->getNickname())) == participaciant.end())
+    if (participaciant.find(this->client->getNickname()) == participaciant.end())
         throw CmdException(server.makeMsg(PREFIX_SERVER, ERR_NOTONCHANNEL(this->client->getNickname(), channelName)));
 
     // /mode #ch -> #ch의 옵션 정보 출력 (구현 범위 x)

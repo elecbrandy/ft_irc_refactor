@@ -45,8 +45,7 @@ void Cmd::cmdInvite() {
 
     // 초대를 보내는 사용자가 해당 채널의 참여자가 아닌 경우
     Channel* ch = chs[chName];
-    std::string nick = ch->isOperatorNickname(client->getNickname());
-    if (ch->getParticipant().find(nick) == ch->getParticipant().end())
+    if (ch->getParticipant().find(client->getNickname()) == ch->getParticipant().end())
         throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_NOTONCHANNEL(client->getNickname(), chName)));
 
     // 채널이 +i 일때, 초대를 보내는 사용자가 채널 오퍼레이터가 아닌 경우
@@ -58,7 +57,7 @@ void Cmd::cmdInvite() {
         throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_NOSUCHNICK(client->getNickname(), target)));
 
     // 초대 당하는 사용자가 이미 해당 채널의 참여자인 경우
-    if (ch->getParticipant().find(ch->isOperatorNickname(target)) != ch->getParticipant().end())
+    if (ch->getParticipant().find(target) != ch->getParticipant().end())
         throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_USERONCHANNEL(target, chName)));
 
     // 채널의 초대 목록에 추가 (초대 목록에 없는 사용자만 추가)

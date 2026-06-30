@@ -73,7 +73,7 @@ void Cmd::cmdTopic() {
 
 	// 채널에 참여한 클라이언트가 아닐 때
 	Channel *ch = channels[chName];
-	if (ch->getParticipant().find(ch->isOperatorNickname(this->client->getNickname())) == ch->getParticipant().end())
+	if (ch->getParticipant().find(this->client->getNickname()) == ch->getParticipant().end())
 		throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_NOTONCHANNEL(client->getNickname(), chName)));
 
 	if (topic.empty()) { // 1: 토픽 파라미터가 없을 때

@@ -48,9 +48,10 @@ void Cmd::checkUsername(const std::string& str) {
 		throw CmdException(server.makeMsg(PREFIX_SERVER, ERR_ERRUSERCMD));
 	}
 	
-	/* ALNUM check */
+	/* 제어문자 / 공백 / '@' 만 거부 (표준 IRC username 은 그 외 문자 허용) */
 	for (std::string::const_iterator it = str.begin(); it != str.end(); ++it) {
-		if (!std::isalnum(static_cast<unsigned char>(*it))) {
+		unsigned char c = static_cast<unsigned char>(*it);
+		if (std::iscntrl(c) || c == ' ' || c == '@') {
 			throw CmdException(server.makeMsg(PREFIX_SERVER, ERR_ERRUSERCMD));
 		}
 	}
@@ -69,9 +70,9 @@ void Cmd::checkRealname(const std::string& str) {
 		throw CmdException(server.makeMsg(PREFIX_SERVER, ERR_ERRUSERCMD));
 	}
 
-	/* ALPHA or SPACE check */
+	/* 제어문자만 거부 (표준 IRC realname 은 임의 문자 허용 — 숫자/기호 포함) */
 	for (std::string::const_iterator it = str.begin(); it != str.end(); ++it) {
-		if (!(std::isalpha(static_cast<unsigned char>(*it)) || std::isspace(static_cast<unsigned char>(*it)))) {
+		if (std::iscntrl(static_cast<unsigned char>(*it))) {
 			throw CmdException(server.makeMsg(PREFIX_SERVER, ERR_ERRUSERCMD));
 		}
 	}

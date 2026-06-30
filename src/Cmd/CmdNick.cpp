@@ -95,16 +95,14 @@ void Cmd::cmdNick() {
 		std::map<std::string, Channel *>::iterator it;
 		for (it = server.getChannels().begin(); it != server.getChannels().end(); ++it) {
 			Channel* ch = it->second;
-			if (ch->isParticipant(ch->isOperatorNickname(oldNick))) {
+			if (ch->isParticipant(oldNick)) {
+				// participant key는 항상 순수 닉네임
+				ch->removeParticipant(oldNick);
+				ch->addParticipant(newNick, client);
+				// 운영자였다면 운영자 목록도 갱신
 				if (ch->isOperator(oldNick)) {
-					ch->removeParticipant(ch->isOperatorNickname(oldNick));
-					ch->addParticipant("@" + newNick, client);
-
 					ch->removeOperator(oldNick);
 					ch->addOperator(newNick, client);
-				} else {
-					ch->removeParticipant(oldNick);
-					ch->addParticipant(newNick, client);
 				}
 			}
 		}

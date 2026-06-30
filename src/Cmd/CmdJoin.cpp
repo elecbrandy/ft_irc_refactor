@@ -128,10 +128,8 @@ void Cmd::cmdJoin() {
 		    static_cast<unsigned int>(ch->getParticipant().size()) >= ch->getLimit())
 			throw Cmd::CmdException(server.makeMsg(PREFIX_SERVER, ERR_CHANNELISFULL(client->getNickname(), chName)));
 
-		// 참여자 추가
-		 std::map<std::string, Client*> participant = ch->getParticipant();
-		 std::string participantName = (participant.empty()) ? '@' + client->getNickname() : client->getNickname();
-		 ch->addParticipant(participantName, client);
+		// 참여자 추가 (운영자 여부는 _operator 셋으로만 판단하므로 key는 항상 순수 닉네임)
+		 ch->addParticipant(client->getNickname(), client);
 
 		// JOIN 알림
 		server.broadcastMsg(server.makeMsg(client->getPrefix(), RPL_JOIN(chName)), ch, -1);

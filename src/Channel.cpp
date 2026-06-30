@@ -1,4 +1,5 @@
 #include "../include/Channel.hpp"
+#include <iostream>
 
 Channel::Channel(std::string name) :
 _name(name), _key(""), _topic(""), _mode() , _participant() {}
@@ -40,14 +41,6 @@ void Channel::removeMode(char mode)
 	this->_mode.erase(mode);
 }
 
-const std::string Channel::isOperatorNickname(std::string nickname) const
-{
-	if (isOperator(nickname) == true)
-		return "@" + nickname;
-	else
-		return nickname;
-}
-
 void Channel::removeParticipant(std::string target){
 	_participant.erase(target);
 }
@@ -69,8 +62,8 @@ std::string Channel::getParticipantNameStr() {
     while (it != _participant.end()) {
         // Client 객체에서 순수한 닉네임만 가져오기
         std::string nickname = it->second->getNickname();
-        // 운영자(@) 표시가 필요한 경우 보존
-        if (it->first[0] == '@') {
+        // 운영자(@) 표시는 _operator 셋으로만 판단
+        if (isOperator(nickname)) {
             names += '@';
         }
         names += nickname;
@@ -82,7 +75,6 @@ std::string Channel::getParticipantNameStr() {
     return names;
 }
 
-#include <iostream>
 bool Channel::isOperator(std::string nickname) const
 {	
 	if (this->_operator.find(nickname) == this->_operator.end())

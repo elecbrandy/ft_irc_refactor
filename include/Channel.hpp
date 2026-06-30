@@ -46,8 +46,6 @@ class Channel {
 		void removeMode(char mode);
 		void removeParticipant(std::string target);
 
-		const std::string isOperatorNickname(std::string nickanme) const;
-
 		std::string getName();
 		std::string getKey();
 		std::string getTopic();
