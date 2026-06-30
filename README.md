@@ -1,6 +1,6 @@
 # ft_irc
 
-![ft_irc_refactor main image](./img/irc_main.png)
+![ft_irc main image](./img/irc_main.png)
 
 <br>
 
@@ -14,9 +14,8 @@
 <br>
 <br>
 
-## 🧩 `ft_irc_refactor` 란?
+## 🧩 `ft_irc` 란?
 
-- **`ft_irc_refactor`** 는 `2024.10-11` 진행했던 `ft_irc` 프로젝트를 리팩토링하기 위해 제작된 저장소입니다.
 - `ft_irc`는 [IRC(Internet Relay Chat)](https://en.wikipedia.org/wiki/Internet_Relay_Chat) 프로토콜을 직접 구현하는 프로젝트입니다.
 - 이 저장소는 소켓 프로그래밍과 네트워크 프로토콜의 기본 구조를 유지하면서, 클라이언트 생명주기와 채널 상태 관리 로직을 더 안전하게 정리하는 것을 목표로 합니다.
 
@@ -25,7 +24,7 @@
 
 ## 🏗️ System Architecture
 
-![ft_irc_refactor system architecture](./img/irc_arch.png)
+![ft_irc system architecture](./img/irc_arch.png)
 
 `ircserv`는 단일 스레드 이벤트 기반 IRC 서버입니다. 모든 클라이언트 I/O는 하나의 `poll()` 루프에서 처리되고, IRC 명령어는 `Cmd` 계층에서 파싱 및 실행됩니다. 서버 상태는 메모리에만 존재하며, 클라이언트와 채널 정보가 단일 source of truth 역할을 합니다.
 
